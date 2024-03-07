@@ -1,7 +1,6 @@
 ﻿cmake_minimum_required (VERSION 3.20)
 message(STATUS "CMake version: ${CMAKE_VERSION}")
 
-
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
   cmake_policy(SET CMP0141 NEW)
@@ -53,17 +52,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googlebenchmark)
 
-#Enable OpenMP
-set(OpenMP_LIBRARY_DIR "C:/Program Files/Microsoft Visual Studio/2022/Preview/VC/Tools/MSVC/14.40.33521/lib/x64")
-set(OpenMP_CXX_FLAGS "-fopenmp")
-set(OpenMP_CXX_LIB_NAMES "libomp")
-set(OpenMP_libomp_LIBRARY "libomp.lib")
-find_package(OpenMP REQUIRED)
+
+# Enable OpenMP
+find_package(OpenMP)
 
 
 # Add source to this project's executable.
 add_executable (matmuldemo "matmuldemo.cpp" "matmuldemo.h")
 
+target_link_libraries(matmuldemo PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(matmuldemo PRIVATE Eigen3::Eigen)
 target_link_libraries(matmuldemo PRIVATE benchmark::benchmark)
-
