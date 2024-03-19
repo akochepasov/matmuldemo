@@ -1,8 +1,10 @@
-﻿// matmuldemo.h : Include file for standard system include files,
-// or project specific include files.
-
-#pragma once
+﻿#pragma once
 
 #include <iostream>
 
-// TODO: Reference additional headers your program requires here.
+
+#ifdef DEMO_CUDA
+void matmul_cuda(int n, int bs, float* A, float* B, float* C);
+void matmul_cublas(int n, float* A, float* B, float* C);
+#endif // DEMO_CUDA
+

@@ -104,27 +104,27 @@ void matmul_omp_simple(int n, const float *A_, const float *B_, float *C_) {
 }
 
 void matmul_omp_tile(int n, int ts, const float *A_, const float *B_, float *C_) {
-  // C = alpha * A x B + beta * C
-  float alpha = 1.0, beta = 0.0;
-  const float *A = (const float *)__builtin_assume_aligned(&A_[0], data_align);
-  const float *B = (const float *)__builtin_assume_aligned(&B_[0], data_align);
-  float       *C =       (float *)__builtin_assume_aligned(&C_[0], data_align);
+    // C = alpha * A x B + beta * C
+    float alpha = 1.0, beta = 0.0;
+    const float *A = (const float *)__builtin_assume_aligned(&A_[0], data_align);
+    const float *B = (const float *)__builtin_assume_aligned(&B_[0], data_align);
+    float       *C =       (float *)__builtin_assume_aligned(&C_[0], data_align);
 
-  omp_set_num_threads(omp_get_num_procs());
+    omp_set_num_threads(omp_get_num_procs());
 
-  #pragma omp parallel for collapse(2)
-  for(int i=0; i<n; i++)
+    #pragma omp parallel for collapse(2)
+    for(int i=0; i<n; i++)
     for(int j=0; j<n; j++)
-      C[i*n+j] *= beta;
+        C[i*n+j] *= beta;
 
-  #pragma omp parallel for schedule(dynamic)
-  for (int i = 0; i < n; i+=ts)
-  for (int k = 0; k < n; k+=ts)
-  for (int j = 0; j < n; j+=ts)
-      for (int ii = i; ii < i+ts; ii++)
-      for (int kk = k; kk < k+ts; kk++)
-      for (int jj = j; jj < j+ts; jj++)
-          C[ii*n+jj] += alpha*A[ii*n+kk]*B[kk*n+jj];
+    #pragma omp parallel for schedule(dynamic)
+    for (int i = 0; i < n; i+=ts)
+    for (int k = 0; k < n; k+=ts)
+    for (int j = 0; j < n; j+=ts)
+        for (int ii = i; ii < i+ts; ii++)
+        for (int kk = k; kk < k+ts; kk++)
+        for (int jj = j; jj < j+ts; jj++)
+            C[ii*n+jj] += alpha*A[ii*n+kk]*B[kk*n+jj];
 }
 
 void matmul_eigen(int n, const float *A_, const float *B_, float *C_) {
@@ -140,11 +140,6 @@ void matmul_eigen(int n, const float *A_, const float *B_, float *C_) {
     Eigen::Map<Eigen::MatrixXf> CM(C, n, n);
     CM.noalias() = beta * CM + alpha * (BM * AM); // fortran order!
 }
-
-#ifdef DEMO_CUDA
-void matmul_cuda(int n, int bs, float* A, float* B, float* C);
-void matmul_cublas(int n, float* A, float* B, float* C);
-#endif // DEMO_CUDA
 
 int cnt = 0;
 
@@ -214,8 +209,8 @@ static const int to = from + nsteps * step;
 #define BENCH_PARAMS_TILED        \
     Unit(benchmark::kMillisecond) \
     ->ArgsProduct({               \
-      benchmark::CreateDenseRange(from, to, step),  \
-      benchmark::CreateRange(4, 64, /*multi=*/2)    \
+        benchmark::CreateDenseRange(from, to, step),  \
+        benchmark::CreateRange(4, 64, /*multi=*/2)    \
     })
 
 

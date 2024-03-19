@@ -4,6 +4,9 @@
 
 #include <cublas_v2.h>
 
+#include "matmuldemo.h"
+
+
 __global__ void matmul_kernel(int n, float *A, float *B, float *C) {
     float alpha = 1.f, beta = 0.f;
     int row = blockIdx.y * blockDim.y + threadIdx.y;
