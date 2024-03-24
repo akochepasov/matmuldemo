@@ -1,6 +1,7 @@
 ﻿cmake_minimum_required (VERSION 3.20)
-message(STATUS "CMake version: ${CMAKE_VERSION}")
-
+message(STATUS "CMAKE_VERSION: ${CMAKE_VERSION}")
+message(STATUS "CMAKE_COMMAND: ${CMAKE_COMMAND}")
+ 
 
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
@@ -9,11 +10,27 @@ if (POLICY CMP0141)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+if (UNIX)
+	# Using GCC
+	# add_compile_options(-msse4.2)
+	add_compile_options(-mavx2)
+	# add_compile_options(-DMKL_ILP64 -m64)
+	#add_compile_options(-mavx512f -mavx512dq -mavx512cd -mavx512bw -mavx512vbmi -mavx512vbmi2 -mavx512vl)
+	add_compile_options(-Wall -Wno-unknown-pragmas)
+	#add_compile_options(-frecord-gcc-switches)
+else()
+    # Using MSVC
+	# add_compile_options crashes nvcc
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2 /openmp:llvm")
+endif()
 
 # CUDA settings
 set(CMAKE_CUDA_FLAGS "-allow-unsupported-compiler")   # Allow VS preview
 set(CMAKE_CUDA_STANDARD 11)
 set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
+set(CMAKE_CUDA_ARCHITECTURES 60) # 70 80
 
 project(matmuldemo LANGUAGES C CXX CUDA)
 

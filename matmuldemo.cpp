@@ -5,6 +5,7 @@
 #include <random>
 
 #include <omp.h>
+#include <immintrin.h>
 
 #include <Eigen/Dense>
 
@@ -43,7 +44,7 @@ void verify_res(int n, const float *C1, const float *C2, int num) {
 
     if (norm > ntol) {
         printf("Norm error (%d): %f\n", num, norm);
-        throw 1;
+        throw "Norm error";
     }
 }
 
@@ -82,7 +83,67 @@ void matmul_naive2(int n, const float *A, const float *B, float *C) {
     }
 }
 
-void matmul_omp_simple(int n, const float *A_, const float *B_, float *C_) {
+void matmul_sse(int n, const float *A_, const float *B_, float *C_) {
+    // C = alpha * A x B + beta * C
+    float alpha = 1.0, beta = 0.0;
+    const float *A = (const float *)__builtin_assume_aligned(&A_[0], data_align);
+    const float *B = (const float *)__builtin_assume_aligned(&B_[0], data_align);
+    float *C = (float *)__builtin_assume_aligned(&C_[0], data_align);
+
+    __m128 alpha4 = _mm_set1_ps(alpha);
+    __m128 beta4 = _mm_set1_ps(beta);
+
+    for (int i = 0; i < n; i++)
+    for (int j = 0; j < n; j += 4) {
+        __m128 c4 = _mm_load_ps(&C[i * n + j]);
+        c4 = _mm_mul_ps(beta4, c4);
+        _mm_store_ps(&C[i * n + j], c4);
+    }
+
+    for (int i = 0; i < n; i++)
+    for (int k = 0; k < n; k++) {
+        __m128 a4 = _mm_set1_ps(A[i * n + k]);
+        a4 = _mm_mul_ps(alpha4, a4);
+        for (int j = 0; j < n; j += 4) {
+            __m128 c4 = _mm_load_ps(&C[i * n + j]);
+            __m128 b4 = _mm_load_ps(&B[k * n + j]);
+            c4 = _mm_add_ps(_mm_mul_ps(a4, b4), c4);
+            _mm_store_ps(&C[i * n + j], c4);
+        }
+    }
+}
+
+void matmul_avx(int n, const float *A_, const float *B_, float *C_) {
+    // C = alpha * A x B + beta * C
+    float alpha = 1.0, beta = 0.0;
+    const float *A = (const float *)__builtin_assume_aligned(&A_[0], data_align);
+    const float *B = (const float *)__builtin_assume_aligned(&B_[0], data_align);
+    float *C = (float *)__builtin_assume_aligned(&C_[0], data_align);
+
+    __m256 alpha8 = _mm256_set1_ps(alpha);
+    __m256 beta8 = _mm256_set1_ps(beta);
+
+    for (int i = 0; i < n; i++)
+    for (int j = 0; j < n; j += 8) {
+        __m256 c8 = _mm256_load_ps(&C[i * n + j]);
+        c8 = _mm256_mul_ps(beta8, c8);
+        _mm256_store_ps(&C[i * n + j], c8);
+    }
+
+    for (int i = 0; i < n; i++)
+    for (int k = 0; k < n; k++) {
+        __m256 a8 = _mm256_set1_ps(A[i * n + k]);
+        a8 = _mm256_mul_ps(alpha8, a8);
+        for (int j = 0; j < n; j += 8) {
+            __m256 c8 = _mm256_load_ps(&C[i * n + j]);
+            __m256 b8 = _mm256_load_ps(&B[k * n + j]);
+            c8 = _mm256_add_ps(_mm256_mul_ps(a8, b8), c8);
+            _mm256_store_ps(&C[i * n + j], c8);
+        }
+    }
+}
+
+void matmul_omp_simple(int n, const float* A_, const float* B_, float* C_) {
     // C = alpha * A x B + beta * C
     float alpha = 1.0, beta = 0.0;
     const float *A = (const float *)__builtin_assume_aligned(&A_[0], data_align);
@@ -145,7 +206,7 @@ int cnt = 0;
 
 class MatMul : public benchmark::Fixture {
 protected:
-    static const int num_func = 7;
+    static const int num_func = 9;
     int i = 0;
     int n;
     float *A, *B, *C;
@@ -186,6 +247,8 @@ BENCHMARK_DEFINE_F(MatMul, Verify)(benchmark::State& st) {
         matmul_omp_tile(n, 4, A, B, D[4]);
         matmul_cuda(n, 4, A, B, D[5]);
         matmul_cublas(n, A, B, D[6]);
+        matmul_sse(n, A, B, D[7]);
+        matmul_avx(n, A, B, D[8]);
     }
 
     for (int i=1; i < num_func; i++)
@@ -197,7 +260,7 @@ BENCHMARK_REGISTER_F(MatMul, Verify)
     ->Arg(16);
 
 
-static const int step = 2048;
+static const int step = 1024;
 static const int from = 2048;
 static const int nsteps = 1; // 2048 = 32M
 static const int to = from + nsteps * step;
@@ -228,11 +291,30 @@ BENCHMARK_REGISTER_F(MatMul, Naive1)->BENCH_PARAMS_SIMPLE;
 BENCHMARK_DEFINE_F(MatMul, Naive2)(benchmark::State& st) {
     for (auto _ : st) {
         matmul_naive2(n, A, B, C);
+        matmul_naive2(n, A, B, C);
         benchmark::DoNotOptimize(C);
         benchmark::ClobberMemory();
     }
 }
 BENCHMARK_REGISTER_F(MatMul, Naive2)->BENCH_PARAMS_SIMPLE;
+
+BENCHMARK_DEFINE_F(MatMul, SSE)(benchmark::State& st) {
+    for (auto _ : st) {
+        matmul_sse(n, A, B, C);
+        benchmark::DoNotOptimize(C);
+        benchmark::ClobberMemory();
+    }
+}
+BENCHMARK_REGISTER_F(MatMul, SSE)->BENCH_PARAMS_SIMPLE;
+
+BENCHMARK_DEFINE_F(MatMul, AVX)(benchmark::State& st) {
+    for (auto _ : st) {
+        matmul_avx(n, A, B, C);
+        benchmark::DoNotOptimize(C);
+        benchmark::ClobberMemory();
+    }
+}
+BENCHMARK_REGISTER_F(MatMul, AVX)->BENCH_PARAMS_SIMPLE;
 
 BENCHMARK_DEFINE_F(MatMul, OpenMPSimple)(benchmark::State& st) {
     for (auto _ : st) {
