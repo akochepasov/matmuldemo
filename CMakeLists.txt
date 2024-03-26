@@ -23,6 +23,7 @@ if (UNIX)
 else()
     # Using MSVC
 	# add_compile_options crashes nvcc
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc") # for googlebenchmark
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2 /openmp:llvm")
 endif()
 

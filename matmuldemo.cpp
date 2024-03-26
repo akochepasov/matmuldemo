@@ -1,5 +1,8 @@
 
-#define DEMO_CUDA
+#define USE_CUDA
+#define USE_NAIVE // too slow
+#define USE_INTRINSICS
+#define USE_OPENMP
 
 #include <iostream>
 #include <random>
@@ -206,7 +209,7 @@ int cnt = 0;
 
 class MatMul : public benchmark::Fixture {
 protected:
-    static const int num_func = 9;
+    static const int num_func = 10;
     int i = 0;
     int n;
     float *A, *B, *C;
@@ -245,10 +248,11 @@ BENCHMARK_DEFINE_F(MatMul, Verify)(benchmark::State& st) {
         matmul_naive2(n, A, B, D[2]);
         matmul_omp_simple(n, A, B, D[3]);
         matmul_omp_tile(n, 4, A, B, D[4]);
-        matmul_cuda(n, 4, A, B, D[5]);
-        matmul_cublas(n, A, B, D[6]);
-        matmul_sse(n, A, B, D[7]);
-        matmul_avx(n, A, B, D[8]);
+        matmul_cuda1D(n, 4, A, B, D[5]);
+        matmul_cuda2D(n, 4, A, B, D[6]);
+        matmul_cublas(n, A, B, D[7]);
+        matmul_sse(n, A, B, D[8]);
+        matmul_avx(n, A, B, D[9]);
     }
 
     for (int i=1; i < num_func; i++)
@@ -260,9 +264,9 @@ BENCHMARK_REGISTER_F(MatMul, Verify)
     ->Arg(16);
 
 
-static const int step = 1024;
-static const int from = 2048;
-static const int nsteps = 1; // 2048 = 32M
+static const int step = 512;
+static const int from = 1024;
+static const int nsteps = 2; // 2048 = 32M
 static const int to = from + nsteps * step;
 
 #define BENCH_PARAMS_SIMPLE       \
@@ -277,7 +281,7 @@ static const int to = from + nsteps * step;
     })
 
 
-#if 0 // Too slow
+#ifdef USE_NAIVE
 BENCHMARK_DEFINE_F(MatMul, Naive1)(benchmark::State& st) {
     for (auto _ : st) {
         matmul_naive1(n, A, B, C);
@@ -286,7 +290,6 @@ BENCHMARK_DEFINE_F(MatMul, Naive1)(benchmark::State& st) {
     }
 }
 BENCHMARK_REGISTER_F(MatMul, Naive1)->BENCH_PARAMS_SIMPLE;
-#endif // 0
 
 BENCHMARK_DEFINE_F(MatMul, Naive2)(benchmark::State& st) {
     for (auto _ : st) {
@@ -297,7 +300,9 @@ BENCHMARK_DEFINE_F(MatMul, Naive2)(benchmark::State& st) {
     }
 }
 BENCHMARK_REGISTER_F(MatMul, Naive2)->BENCH_PARAMS_SIMPLE;
+#endif // USE_NAIVE
 
+#ifdef USE_INTRINSICS
 BENCHMARK_DEFINE_F(MatMul, SSE)(benchmark::State& st) {
     for (auto _ : st) {
         matmul_sse(n, A, B, C);
@@ -315,7 +320,9 @@ BENCHMARK_DEFINE_F(MatMul, AVX)(benchmark::State& st) {
     }
 }
 BENCHMARK_REGISTER_F(MatMul, AVX)->BENCH_PARAMS_SIMPLE;
+#endif // USE_INTRINSICS
 
+#ifdef USE_OPENMP
 BENCHMARK_DEFINE_F(MatMul, OpenMPSimple)(benchmark::State& st) {
     for (auto _ : st) {
         matmul_omp_simple(n, A, B, C);
@@ -324,15 +331,6 @@ BENCHMARK_DEFINE_F(MatMul, OpenMPSimple)(benchmark::State& st) {
     }
 }
 BENCHMARK_REGISTER_F(MatMul, OpenMPSimple)->BENCH_PARAMS_SIMPLE;
-
-BENCHMARK_DEFINE_F(MatMul, Eign)(benchmark::State& st) {
-    for (auto _ : st) {
-        matmul_eigen(n, A, B, C);
-        benchmark::DoNotOptimize(C);
-        benchmark::ClobberMemory();
-    }
-}
-BENCHMARK_REGISTER_F(MatMul, Eign)->BENCH_PARAMS_SIMPLE;
 
 BENCHMARK_DEFINE_F(MatMul, OpenMPTile)(benchmark::State& st) {
     int ts = n / st.range(1);
@@ -343,17 +341,37 @@ BENCHMARK_DEFINE_F(MatMul, OpenMPTile)(benchmark::State& st) {
     }
 }
 BENCHMARK_REGISTER_F(MatMul, OpenMPTile)->BENCH_PARAMS_TILED;
+#endif // USE_OPENMP
 
-#ifdef DEMO_CUDA
-BENCHMARK_DEFINE_F(MatMul, CudaKernel)(benchmark::State& st) {
-    int thrs = n / st.range(1);
+BENCHMARK_DEFINE_F(MatMul, Eign)(benchmark::State& st) {
     for (auto _ : st) {
-        matmul_cuda(n, thrs, A, B, C);
+        matmul_eigen(n, A, B, C);
         benchmark::DoNotOptimize(C);
         benchmark::ClobberMemory();
     }
 }
-BENCHMARK_REGISTER_F(MatMul, CudaKernel)->BENCH_PARAMS_TILED;
+BENCHMARK_REGISTER_F(MatMul, Eign)->BENCH_PARAMS_SIMPLE;
+
+#ifdef USE_CUDA
+BENCHMARK_DEFINE_F(MatMul, CudaKernel1D)(benchmark::State& st) {
+    int thrs = n / st.range(1);
+    for (auto _ : st) {
+        matmul_cuda1D(n, thrs, A, B, C);
+        benchmark::DoNotOptimize(C);
+        benchmark::ClobberMemory();
+    }
+}
+BENCHMARK_REGISTER_F(MatMul, CudaKernel1D)->BENCH_PARAMS_TILED;
+
+BENCHMARK_DEFINE_F(MatMul, CudaKernel2D)(benchmark::State& st) {
+    int thrs = n / st.range(1);
+    for (auto _ : st) {
+        matmul_cuda2D(n, thrs, A, B, C);
+        benchmark::DoNotOptimize(C);
+        benchmark::ClobberMemory();
+    }
+}
+BENCHMARK_REGISTER_F(MatMul, CudaKernel2D)->BENCH_PARAMS_TILED;
 
 BENCHMARK_DEFINE_F(MatMul, CuBlas)(benchmark::State& st) {
     for (auto _ : st) {
@@ -363,7 +381,7 @@ BENCHMARK_DEFINE_F(MatMul, CuBlas)(benchmark::State& st) {
     }
 }
 BENCHMARK_REGISTER_F(MatMul, CuBlas)->BENCH_PARAMS_SIMPLE;
-#endif // DEMO_CUDA
+#endif // USE_CUDA
 
 
 BENCHMARK_MAIN();
