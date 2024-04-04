@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#define CEIL_DIV(x, y) (((x) + (y) - 1) / (y))
 
 #ifdef USE_CUDA
 void matmul_cuda1D(int n, int bs, float* A, float* B, float* C);

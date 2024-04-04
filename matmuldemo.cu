@@ -21,8 +21,8 @@ __global__ void matmul_kernel1D(int n, float* A, float* B, float* C) {
 
 __global__ void matmul_kernel2D(int n, float *A, float *B, float *C) {
     float alpha = 1.f, beta = 0.f;
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    int col = blockIdx.y * blockDim.y + threadIdx.y;
 
     if (!(row < n && col < n))
         return;
@@ -38,7 +38,7 @@ void matmul_cuda1D(int n, int nthreads, float* A, float* B, float* C) {
     thrust::device_vector<float> dvB(B, B + n * n);
     thrust::device_vector<float> dvC(n * n);
 
-    int nblocks = (n + nthreads - 1)  / nthreads;
+    int nblocks = CEIL_DIV(n, nthreads);
 
     matmul_kernel1D<<<nblocks * n, nthreads>>>(n,
         thrust::raw_pointer_cast(&dvA[0]),
@@ -53,7 +53,7 @@ void matmul_cuda2D(int n, int nthreads, float* A, float* B, float* C) {
     thrust::device_vector<float> dvB(B, B + n * n);
     thrust::device_vector<float> dvC(n * n);
 
-    int nblocks = (n + nthreads - 1) / nthreads;
+    int nblocks = CEIL_DIV(n, nthreads);
 
     dim3 blksPerGrid(nblocks, nblocks);
     dim3 thrsPerBlock(nthreads, nthreads);
