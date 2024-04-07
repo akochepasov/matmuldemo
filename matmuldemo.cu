@@ -1,6 +1,6 @@
 #include <thrust/device_vector.h>
 #include <thrust/copy.h>
-#include <thrust/extrema.h> 
+#include <thrust/extrema.h>
 
 #include <cublas_v2.h>
 
@@ -14,7 +14,7 @@ __global__ void matmul_kernel1D(int n, float* A, float* B, float* C) {
     // int j = id / n; int i = id % n; // This access pattern 10-100x slower
 
     C[i * n + j] *= beta;
-    
+
     for (int k = 0; k < n; k++)
         C[i * n + j] += alpha * A[i * n + k] * B[k * n + j];
 }

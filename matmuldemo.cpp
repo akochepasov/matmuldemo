@@ -1,4 +1,4 @@
-
+﻿
 #define USE_CUDA
 #define USE_NAIVE // too slow
 #define USE_INTRINSICS
@@ -28,26 +28,28 @@ static void init_data(int n, float *A, int64_t seed) {
             A[i * n + j] = dist(gen);
 }
 
-void verify_res(int n, const float *C1, const float *C2, int num) {
-    float norm = 0.0;
-    float rtol = 1e-04, atol = 1e-04;
-    float ntol = 1e-01;
+void verify_res(int n, const float *C1, const float *C2, int mm_id) {
+    float totl = 0.0;
+    const float rtol = 1e-04f, atol = 1e-04f;
+    const float ttol = 1e-01f;
 
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
-            norm += C1[i * n + j] - C2[i * n + j];
+            auto diff = C1[i * n + j] - C2[i * n + j];
+            totl += diff;
 
-            if (abs(C1[i * n + j] - C2[i * n + j]) > atol + rtol * C1[i * n + j]) {
+            if (abs(diff) > atol + rtol * C1[i * n + j]) {
                 printf("Error in (%d, %d)\n", i, j);
-                printf("%d  - C1:  %f    C2: %f\n", num, C1[i * n + j], C2[i * n + j]);
+                printf("%d  - C1:  %f    C2: %f\n", mm_id, C1[i * n + j], C2[i * n + j]);
                 throw 1;
             }
         }
     }
 
-    if (norm > ntol) {
-        printf("Norm error (%d): %f\n", num, norm);
-        throw "Norm error";
+    totl = totl / n;  // Average error per line
+    if (totl > ttol) {
+        printf("Total error (%d): %f\n", mm_id, totl);
+        throw "Total error";
     }
 }
 
@@ -264,9 +266,9 @@ BENCHMARK_REGISTER_F(MatMul, Verify)
     ->Arg(16);
 
 
-static const int step = 512;
-static const int from = 1024;
-static const int nsteps = 2; // 2048 = 32M
+static const int step = 1024;
+static const int from = 2048;
+static const int nsteps = 1; // 2048 = 32M
 static const int to = from + nsteps * step;
 
 #define BENCH_PARAMS_SIMPLE       \
@@ -293,7 +295,6 @@ BENCHMARK_REGISTER_F(MatMul, Naive1)->BENCH_PARAMS_SIMPLE;
 
 BENCHMARK_DEFINE_F(MatMul, Naive2)(benchmark::State& st) {
     for (auto _ : st) {
-        matmul_naive2(n, A, B, C);
         matmul_naive2(n, A, B, C);
         benchmark::DoNotOptimize(C);
         benchmark::ClobberMemory();

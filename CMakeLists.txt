@@ -1,6 +1,6 @@
 ﻿cmake_minimum_required (VERSION 3.20)
 message(STATUS "CMAKE_VERSION: ${CMAKE_VERSION}")
-message(STATUS "CMAKE_COMMAND: ${CMAKE_COMMAND}") 
+message(STATUS "CMAKE_COMMAND: ${CMAKE_COMMAND}")
 include(FetchContent)
 
 
@@ -28,7 +28,7 @@ else()
 endif()
 
 # CUDA settings
-set(CUDA_VERBOSE_BUILD OFF)
+set(CUDA_VERBOSE_BUILD ON)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
 set(CMAKE_CUDA_ARCHITECTURES 60) # 70 80
@@ -40,10 +40,9 @@ project(matmuldemo LANGUAGES CXX CUDA)
 
 
 # Enable eigen
-set(BUILD_TESTING OFF)	
+set(BUILD_TESTING OFF)
 # set(EIGEN_BUILD_TESTING OFF)
 set(EIGEN_MPL2_ONLY ON)
-set(EIGEN_BUILD_PKGCONFIG OFF)
 set(EIGEN_BUILD_DOC OFF)
 set(EIGEN_BUILD_PKGCONFIG OFF)
 
@@ -55,7 +54,6 @@ FetchContent_Declare(
   GIT_PROGRESS TRUE
 )
 FetchContent_MakeAvailable(eigen)
-
 
 # Enable google benchmark
 set(BENCHMARK_ENABLE_GTEST_TESTS OFF)
@@ -72,10 +70,10 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googlebenchmark)
 
-
 # Enable OpenMP
 find_package(OpenMP REQUIRED)
 
+# Enable CUDA
 find_package(CUDAToolkit REQUIRED)
 
 
