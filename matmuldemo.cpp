@@ -1,6 +1,6 @@
 ﻿
 #define USE_CUDA
-#define USE_NAIVE // too slow
+// #define USE_NAIVE // too slow
 #define USE_INTRINSICS
 #define USE_OPENMP
 
@@ -211,7 +211,7 @@ int cnt = 0;
 
 class MatMul : public benchmark::Fixture {
 protected:
-    static const int num_func = 10;
+    static const int num_func = 11;
     int i = 0;
     int n;
     float *A, *B, *C;
@@ -245,20 +245,26 @@ BENCHMARK_DEFINE_F(MatMul, Verify)(benchmark::State& st) {
     n = st.range(0);
 
     for (auto _ : st) {
-        matmul_eigen(n, A, B, D[0]);
-        matmul_naive1(n, A, B, D[1]);
-        matmul_naive2(n, A, B, D[2]);
-        matmul_omp_simple(n, A, B, D[3]);
-        matmul_omp_tile(n, 4, A, B, D[4]);
-        matmul_cuda1D(n, 4, A, B, D[5]);
-        matmul_cuda2D(n, 4, A, B, D[6]);
-        matmul_cublas(n, A, B, D[7]);
-        matmul_sse(n, A, B, D[8]);
-        matmul_avx(n, A, B, D[9]);
+        int i = 0; matmul_eigen(n, A, B, D[0]); // Reference function
+#ifdef USE_NAIVE
+        i = 1; matmul_naive1(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
+        i = 2; matmul_naive2(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
+#endif // USE_NAIVE
+#ifdef USE_OPENMP
+        i = 3; matmul_omp_simple(n, A, B, D[i]);  verify_res(n, D[0], D[i], i);
+        i = 4; matmul_omp_tile(n, 4, A, B, D[i]); verify_res(n, D[0], D[i], i);
+#endif // USE_OPENMP
+#ifdef USE_CUDA
+        i = 5; matmul_cuda1D(n, 4, A, B, D[i]); verify_res(n, D[0], D[i], i);
+        i = 6; matmul_cuda2D(n, 4, A, B, D[i]); verify_res(n, D[0], D[i], i);
+        i = 7; matmul_cublas(n, A, B, D[i]);  verify_res(n, D[0], D[i], i);
+        i = 8; matmul_cutlass(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
+#endif // USE_CUDA
+#ifdef USE_INTRINSICS
+        i = 9;  matmul_sse(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
+        i = 10; matmul_avx(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
+#endif USE_INTRINSICS
     }
-
-    for (int i=1; i < num_func; i++)
-        verify_res(n, D[0], D[i], i);
 }
 
 BENCHMARK_REGISTER_F(MatMul, Verify)
@@ -382,6 +388,15 @@ BENCHMARK_DEFINE_F(MatMul, CuBlas)(benchmark::State& st) {
     }
 }
 BENCHMARK_REGISTER_F(MatMul, CuBlas)->BENCH_PARAMS_SIMPLE;
+
+BENCHMARK_DEFINE_F(MatMul, Cutlass)(benchmark::State& st) {
+    for (auto _ : st) {
+        matmul_cutlass(n, A, B, C);
+        benchmark::DoNotOptimize(C);
+        benchmark::ClobberMemory();
+    }
+}
+BENCHMARK_REGISTER_F(MatMul, Cutlass)->BENCH_PARAMS_SIMPLE;
 #endif // USE_CUDA
 
 
