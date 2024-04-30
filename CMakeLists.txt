@@ -29,8 +29,9 @@ if (UNIX)
 else()
     # Using MSVC
 	# add_compile_options crashes nvcc
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc") # for googlebenchmark
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2 /openmp:llvm")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")          # for googlebenchmark
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /openmp:llvm")   # Use OpenMP3.1 (doesn't work still)
 endif()
 
 # CUDA settings
