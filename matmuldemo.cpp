@@ -155,8 +155,6 @@ void matmul_omp_simple(int n, const float* A_, const float* B_, float* C_) {
     const float *B = (const float *)__builtin_assume_aligned(&B_[0], data_align);
     float       *C =       (float *)__builtin_assume_aligned(&C_[0], data_align);
 
-    omp_set_num_threads(omp_get_num_procs());
-
     #pragma omp parallel for collapse(2)
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++)
@@ -175,8 +173,6 @@ void matmul_omp_tile(int n, int ts, const float *A_, const float *B_, float *C_)
     const float *A = (const float *)__builtin_assume_aligned(&A_[0], data_align);
     const float *B = (const float *)__builtin_assume_aligned(&B_[0], data_align);
     float       *C =       (float *)__builtin_assume_aligned(&C_[0], data_align);
-
-    omp_set_num_threads(omp_get_num_procs());
 
     #pragma omp parallel for collapse(2)
     for(int i=0; i<n; i++)
