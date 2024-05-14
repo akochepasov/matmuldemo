@@ -1,6 +1,6 @@
 ﻿
 #define USE_CUDA
-// #define USE_NAIVE // too slow
+#define USE_NAIVE // too slow
 #define USE_INTRINSICS
 #define USE_OPENMP
 
@@ -207,7 +207,7 @@ int cnt = 0;
 
 class MatMul : public benchmark::Fixture {
 protected:
-    static const int num_func = 11;
+    static const int num_func = 12;
     int i = 0;
     int n;
     float *A, *B, *C;
@@ -253,10 +253,12 @@ BENCHMARK_DEFINE_F(MatMul, Verify)(benchmark::State& st) {
 #ifdef USE_CUDA
         i = 5; matmul_cuda1D(n, 4, A, B, D[i]); verify_res(n, D[0], D[i], i);
         i = 6; matmul_cuda2D(n, 4, A, B, D[i]); verify_res(n, D[0], D[i], i);
-        i = 7; matmul_cublas(n, A, B, D[i]);  verify_res(n, D[0], D[i], i);
-        i = 8; matmul_cutlass(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
+        i = 7; matmul_cuda2D_coalesce(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
+        i = 8; matmul_cublas(n, A, B, D[i]);  verify_res(n, D[0], D[i], i);
+        i = 9; matmul_cutlass(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
 #endif // USE_CUDA
 #ifdef USE_INTRINSICS
+<<<<<<< HEAD
         i = 9;  matmul_sse(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
         i = 10; matmul_avx(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
 #endif // USE_INTRINSICS
@@ -265,11 +267,12 @@ BENCHMARK_DEFINE_F(MatMul, Verify)(benchmark::State& st) {
 
 BENCHMARK_REGISTER_F(MatMul, Verify)
     ->Unit(benchmark::kMillisecond)
-    ->Arg(16);
+    ->Iterations(1)
+    ->Arg(64);
 
 
 static const int step = 1024;
-static const int from = 2048;
+static const int from = 1024 + 512; // 2048
 static const int nsteps = 1; // 2048 = 32M
 static const int to = from + nsteps * step;
 
@@ -281,8 +284,8 @@ static const int to = from + nsteps * step;
     Unit(benchmark::kMillisecond) \
     ->ArgsProduct({               \
         benchmark::CreateDenseRange(from, to, step),  \
-        benchmark::CreateRange(4, 64, /*multi=*/2)    \
-    })
+        benchmark::CreateRange(4, 256, /*multi=*/4)   \
+    }) // 4, 16, 64, 256
 
 
 #ifdef USE_NAIVE
@@ -375,6 +378,25 @@ BENCHMARK_DEFINE_F(MatMul, CudaKernel2D)(benchmark::State& st) {
     }
 }
 BENCHMARK_REGISTER_F(MatMul, CudaKernel2D)->BENCH_PARAMS_TILED;
+
+BENCHMARK_DEFINE_F(MatMul, CudaKernelCoalesce)(benchmark::State& st) {
+    for (auto _ : st) {
+        matmul_cuda2D_coalesce(n, A, B, C);
+        benchmark::DoNotOptimize(C);
+        benchmark::ClobberMemory();
+    }
+}
+BENCHMARK_REGISTER_F(MatMul, CudaKernelCoalesce)->BENCH_PARAMS_SIMPLE;
+
+//BENCHMARK_DEFINE_F(MatMul, CudaKernel2DTile)(benchmark::State& st) {
+//    int thrs = n / st.range(1);
+//    for (auto _ : st) {
+//        matmul_cuda2D_tile(n, thrs, A, B, C);
+//        benchmark::DoNotOptimize(C);
+//        benchmark::ClobberMemory();
+//    }
+//}
+//BENCHMARK_REGISTER_F(MatMul, CudaKernel2DTile)->BENCH_PARAMS_TILED;
 
 BENCHMARK_DEFINE_F(MatMul, CuBlas)(benchmark::State& st) {
     for (auto _ : st) {
