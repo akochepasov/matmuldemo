@@ -1,9 +1,4 @@
 ﻿cmake_minimum_required (VERSION 3.20)
-message(STATUS "CMAKE_VERSION:    ${CMAKE_VERSION}")
-message(STATUS "CMAKE_COMMAND:    ${CMAKE_COMMAND}")
-message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
-include(FetchContent)
-
 
 # CMAKE settings
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -13,6 +8,12 @@ if (NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
 	# Release is the default configuration
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
 endif()
+
+
+message(STATUS "CMAKE_VERSION:    ${CMAKE_VERSION}")
+message(STATUS "CMAKE_COMMAND:    ${CMAKE_COMMAND}")
+message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
+include(FetchContent)
 
 # CPP settings
 set(CMAKE_CXX_STANDARD 17)
@@ -40,10 +41,11 @@ set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
 set(CMAKE_CUDA_ARCHITECTURES 60) # 70 80
 set(CMAKE_CUDA_FLAGS "-allow-unsupported-compiler")   # Allow VS preview
-IF(CMAKE_BUILD_TYPE MATCHES DEBUG)
+
+IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
     message("Debug mode")
     set(CMAKE_CUDA_FLAGS_DEBUG "-g -G -src-in-ptx --cudart shared")
-ENDIF(CMAKE_BUILD_TYPE MATCHES DEBUG)
+ENDIF(CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 
 project(matmuldemo LANGUAGES CXX CUDA)
