@@ -243,24 +243,23 @@ BENCHMARK_DEFINE_F(MatMul, Verify)(benchmark::State& st) {
     for (auto _ : st) {
         int i = 0; matmul_eigen(n, A, B, D[0]); // Reference function
 #ifdef USE_NAIVE
-        i = 1; matmul_naive1(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
-        i = 2; matmul_naive2(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
+        i++; matmul_naive1(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
+        i++; matmul_naive2(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
 #endif // USE_NAIVE
 #ifdef USE_OPENMP
-        i = 3; matmul_omp_simple(n, A, B, D[i]);  verify_res(n, D[0], D[i], i);
-        i = 4; matmul_omp_tile(n, 4, A, B, D[i]); verify_res(n, D[0], D[i], i);
+        i++; matmul_omp_simple(n, A, B, D[i]);  verify_res(n, D[0], D[i], i);
+        i++; matmul_omp_tile(n, 4, A, B, D[i]); verify_res(n, D[0], D[i], i);
 #endif // USE_OPENMP
 #ifdef USE_CUDA
-        i = 5; matmul_cuda1D(n, 4, A, B, D[i]); verify_res(n, D[0], D[i], i);
-        i = 6; matmul_cuda2D(n, 4, A, B, D[i]); verify_res(n, D[0], D[i], i);
-        i = 7; matmul_cuda2D_coalesce(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
-        i = 8; matmul_cublas(n, A, B, D[i]);  verify_res(n, D[0], D[i], i);
-        i = 9; matmul_cutlass(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
+        i++; matmul_cuda1D(n, 4, A, B, D[i]); verify_res(n, D[0], D[i], i);
+        i++; matmul_cuda2D(n, 4, A, B, D[i]); verify_res(n, D[0], D[i], i);
+        i++; matmul_cuda2D_coalesce(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
+        i++; matmul_cublas(n, A, B, D[i]);  verify_res(n, D[0], D[i], i);
+        i++; matmul_cutlass(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
 #endif // USE_CUDA
 #ifdef USE_INTRINSICS
-<<<<<<< HEAD
-        i = 9;  matmul_sse(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
-        i = 10; matmul_avx(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
+        i++; matmul_sse(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
+        i++; matmul_avx(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
 #endif // USE_INTRINSICS
     }
 }
