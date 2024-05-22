@@ -259,7 +259,7 @@ BENCHMARK_DEFINE_F(MatMul, Verify)(benchmark::State& st) {
 #ifdef USE_INTRINSICS
         i = 9;  matmul_sse(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
         i = 10; matmul_avx(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
-#endif USE_INTRINSICS
+#endif // USE_INTRINSICS
     }
 }
 
