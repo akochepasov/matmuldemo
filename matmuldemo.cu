@@ -54,37 +54,56 @@ __global__ void sgemm_global_mem_coalesce(int M, int N, int K, float alpha,
     C[cRow * N + cCol] = alpha * tmp + beta * C[cRow * N + cCol];
 }
 
+#define SWAP(a, b) \
+    { \
+        (a) ^= (b); \
+        (b) ^= (a); \
+        (a) ^= (b); \
+    }
+
+__device__ unsigned next_pow2(unsigned value) {
+    // From the bit twiddle page
+    unsigned above = (value - 1);
+    above |= above >> 1;
+    above |= above >> 2;
+    above |= above >> 4;
+    above |= above >> 8;
+    above |= above >> 16;
+    return ++above;
+}
+
 const int BK = 8;
 const int TM = 8;
 const int TN = 8;
-const int BM = 128;
-const int BN = 128;
+const int BM_ = 128;
+const int BN_ = 128;
 
-__device__ static bool debug = true;
+__global__ void
+sgemm2DBlocktiling(int n, const float* A, const float* B, float* C) {
+    // Idea taken from https://github.com/siboehm/SGEMM_CUDA/
+    // explanation https://siboehm.com/articles/22/CUDA-MMM
+    float alpha = 1.0f, beta = 0.0f;
+    int M = n, N = n, K = n;
 
-__global__ void 
-sgemm2DBlocktiling(int M, int N, int K, float alpha, const float* A,
-    const float* B, float beta, float* C) {
     const int cRow = blockIdx.y;
     const int cCol = blockIdx.x;
 
-    const int totalResultsBlocktile = BM * BN;
-    // A thread is responsible for calculating TM*TN elements in the blocktile
-    const int numThreadsBlocktile = totalResultsBlocktile / (TM * TN);
+    auto BM = min(next_pow2(M), BM_); // BM and BN get smaller int
+    auto BN = min(next_pow2(N), BN_); // short dimentions
 
-    // ResultsPerBlock / ResultsPerThread == ThreadsPerBlock
-    assert(numThreadsBlocktile == blockDim.x);
+    // A thread is responsible for calculating TM*TN elements in the blocktile
+    const int numThreadsBlocktile = (BM * BN) / (TM * TN);  // 128 * 128 / (8 * 8) = 256
 
     // BN/TN are the number of threads to span a column
-    const int threadRow = threadIdx.x / (BN / TN);
-    const int threadCol = threadIdx.x % (BN / TN);
+    const int threadRow = threadIdx.x / (BN / TN);  // 128 / 8 = 16
+    const int threadCol = threadIdx.x % (BN / TN);  // 128 / 8 = 16
 
     if (!(threadRow < M && threadCol < N))
         return;
 
-    // allocate space for the current blocktile in smem
-    __shared__ float As[BM * BK];
-    __shared__ float Bs[BK * BN];
+    // allocate space for the current blocktile in SMEM
+    __shared__ float As[BM_ * BK];  // BM * BK = 128 * 8 = 1024
+    __shared__ float Bs[BK * BN_];  // BK * BN = 8 * 128 = 2014
 
     // Move blocktile to beginning of A's row and B's column
     A += cRow * BM * K;
@@ -92,44 +111,37 @@ sgemm2DBlocktiling(int M, int N, int K, float alpha, const float* A,
     C += cRow * BM * N + cCol * BN;
 
     // calculating the indices that this thread will load into SMEM
-    const int innerRowA = threadIdx.x / BK;
-    const int innerColA = threadIdx.x % BK;
+    const int innerRowA = threadIdx.x / BK;  // BK = 8
+    const int innerColA = threadIdx.x % BK;  // BK = 8
     // calculates the number of rows of As that are being loaded in a single step
     // by a single block
-    const int strideA = numThreadsBlocktile / BK;
-    const int innerRowB = threadIdx.x / BN;
-    const int innerColB = threadIdx.x % BN;
+    const int strideA = max(numThreadsBlocktile / BK, 1);   // 256 / 8 = 32
+    const int innerRowB = threadIdx.x / BN;  // BN = 128
+    const int innerColB = threadIdx.x % BN;  // BN = 128
     // for both As and Bs we want each load to span the full column-width, for
     // better GMEM coalescing (as opposed to spanning full row-width and iterating
     // across columns)
-    const int strideB = numThreadsBlocktile / BN;
+    const int strideB = max(numThreadsBlocktile / BN, 1);  // 256 / 128
 
     // allocate thread-local cache for results in registerfile
     float threadResults[TM * TN] = { 0.0 };
     // register caches for As and Bs
-    float regM[TM] = { 0.0 };
-    float regN[TN] = { 0.0 };
+    float regM[TM] = { 0.0 };   // TM = 8
+    float regN[TN] = { 0.0 };   // TN = 8
 
     // outer-most loop over block tiles
-    for (int bkIdx = 0; bkIdx < K; bkIdx += BK) {
+    for (int bkIdx = 0; bkIdx < K; bkIdx += BK) {  // BK = 8
         // populate the SMEM caches
-        for (int loadOffset = 0; loadOffset < BM; loadOffset += strideA) {
-            As[(innerRowA + loadOffset) * BK + innerColA] =
+        int loadOffset;
+        for (loadOffset = 0; loadOffset < BM; loadOffset += strideA) {  // (128 * 128) / (8 * 8) / 8 = 32
+            As[(innerRowA + loadOffset) * BK + innerColA] =             // (BM * BN) / (TM * TN) / BK
                 A[(innerRowA + loadOffset) * K + innerColA];
         }
-        for (int loadOffset = 0; loadOffset < BK; loadOffset += strideB) {
+        for (loadOffset = 0; loadOffset < BK; loadOffset += strideB) {  // (BM * BN) / (TM * TN) / BN = 32
             Bs[(innerRowB + loadOffset) * BN + innerColB] =
                 B[(innerRowB + loadOffset) * N + innerColB];
         }
-        if (debug) 
-            printf( "{%2d %2d: %3d} %d "
-                    "As %3d .. %3d (%d) <= A: %5d .. %5d (%d) -> "
-                    "Bs %3d .. %3d (%d) <= B: %5d .. %5d (%d)\n",
-            cRow, cCol, threadIdx.x, bkIdx,
-                ((innerRowA + 0) * BK) + innerColA, ((innerRowA + (BM - 1)) * BK) + innerColA, strideA,
-                ((innerRowA + 0) * K ) + innerColA, ((innerRowA + (BM - 1)) * K ) + innerColA, strideA,
-                ((innerRowB + 0) * BN) + innerColB, ((innerRowB + (BK - 1)) * BN) + innerColB, strideB,
-                ((innerRowB + 0) * N ) + innerColB, ((innerRowB + (BK - 1)) * N ) + innerColB, strideB);
+
         __syncthreads();
 
         // advance blocktile
@@ -145,23 +157,12 @@ sgemm2DBlocktiling(int M, int N, int K, float alpha, const float* A,
             for (int i = 0; i < TN; ++i) {
                 regN[i] = Bs[dotIdx * BN + threadCol * TN + i];
             }
-            if (debug)
-                printf( "{%2d %2d: %3d} %d " 
-                        "RegM: %5d .. %5d -> RegN: %5d .. %5d\n", 
-                    cRow, cCol, threadIdx.x, dotIdx,
-                        (threadRow * TM + 0)    * BK + dotIdx, (threadRow * TM + TM) * BK + dotIdx,
-                        dotIdx * BN + threadCol * TN + 0,       dotIdx * BN + threadCol * TN + TN);
             for (int resIdxM = 0; resIdxM < TM; ++resIdxM) {
                 for (int resIdxN = 0; resIdxN < TN; ++resIdxN) {
                     threadResults[resIdxM * TN + resIdxN] +=
                         regM[resIdxM] * regN[resIdxN];
                 }
             }
-            if (debug)
-                printf( "{%2d %2d: %3d} %d threadRes2D: %5d .. %5d -> threadRes2D: %5d .. %5d\n",
-                    cRow, cCol, threadIdx.x, dotIdx,
-                               0 * TN + 0,       0 * TN + TN - 1,
-                        (TM - 1) * TN + 0, (TM - 1)* TN + TN - 1);
         }
         __syncthreads();
     }
@@ -174,11 +175,6 @@ sgemm2DBlocktiling(int M, int N, int K, float alpha, const float* A,
                 beta * C[(threadRow * TM + resIdxM) * N + threadCol * TN + resIdxN];
         }
     }
-    if (debug)
-        printf( "{%2d %2d: %3d} C2D: %5d .. %5d -> C2D: %5d .. %5d\n",
-        cRow, cCol, threadIdx.x, 
-            (threadRow * TM + 0)      * N + threadCol * TN + 0, (threadRow * TM + 0) * N      + threadCol * TN + TN - 1,
-            (threadRow * TM + TM - 1) * N + threadCol * TN + 0, (threadRow * TM + TM - 1) * N + threadCol * TN + TN - 1);
 }
 
 void matmul_cuda1D(int n, int nthreads, float* A, float* B, float* C) {
@@ -212,29 +208,19 @@ void matmul_cuda2D(int n, int nthreads, float* A, float* B, float* C) {
     thrust::copy(dvC.begin(), dvC.end(), C);
 }
 
-void matmul_cuda2D_tile(int n, int nthreads, float* A, float* B, float* C) {
+void matmul_cuda2D_8tiles(int n, float* A, float* B, float* C) {
     thrust::device_vector<float> dvA(A, A + n * n);
     thrust::device_vector<float> dvB(B, B + n * n);
     thrust::device_vector<float> dvC(n * n);
 
-    //int nblocks = CEIL_DIV(n, nthreads);
-    //dim3 blksPerGrid(nblocks, nblocks);
-    //dim3 thrsPerBlock(nthreads);
-    //dim3 thrsPerBlock(128 * 128 / 8 * 8);
-
-    //matmul_kernel2DBlocktiling<<<blksPerGrid, thrsPerBlock>>> (n,
-    //    thrust::raw_pointer_cast(&dvA[0]),
-    //    thrust::raw_pointer_cast(&dvB[0]),
-    //    thrust::raw_pointer_cast(&dvC[0]));
     auto dA = thrust::raw_pointer_cast(&dvA[0]);
     auto dB = thrust::raw_pointer_cast(&dvB[0]);
     auto dC = thrust::raw_pointer_cast(&dvC[0]);
 
-    int M = n, N = n, K = n;
-    float alpha = 1.0f, beta = 0.0f;
-    dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-    dim3 blockDim((BM * BN) / (TM * TN));
-    sgemm2DBlocktiling<<<gridDim, blockDim>>>(M, N, K, alpha, dA, dB, beta, dC);
+    auto BM = BM_, BN = BN_;
+    dim3 gridDim(CEIL_DIV(n, BN), CEIL_DIV(n, BM));  // (BM, BN) = (128, 128)
+    dim3 blockDim((BM * BN) / (TM * TN));            // 128 * 128 / (8 * 8) = 256
+    sgemm2DBlocktiling<<<gridDim, blockDim>>>(n, dA, dB, dC);
 
     thrust::copy(dvC.begin(), dvC.end(), C);
 }
@@ -248,11 +234,12 @@ void matmul_cuda2D_coalesce(int n, float* A, float* B, float* C) {
     auto dB = thrust::raw_pointer_cast(&dvB[0]);
     auto dC = thrust::raw_pointer_cast(&dvC[0]);
 
+    const int BK = 32;
     int M = n, N = n, K = n;
     float alpha = 1.0f, beta = 0.0f;
-    dim3 gridDim(CEIL_DIV(N, 32), CEIL_DIV(M, 32));
-    dim3 blockDim((32 * 32));
-    sgemm_global_mem_coalesce<32><<<gridDim, blockDim>>>(M, N, K, alpha, dA, dB, beta, dC);
+    dim3 gridDim(CEIL_DIV(N, BK), CEIL_DIV(M, BK));
+    dim3 blockDim((BK * BK));
+    sgemm_global_mem_coalesce<BK><<<gridDim, blockDim>>>(M, N, K, alpha, dA, dB, beta, dC);
 
     thrust::copy(dvC.begin(), dvC.end(), C);
 }

@@ -1,9 +1,4 @@
 ﻿
-#define USE_CUDA
-#define USE_NAIVE // too slow
-#define USE_INTRINSICS
-#define USE_OPENMP
-
 #include <iostream>
 #include <random>
 
@@ -207,7 +202,7 @@ int cnt = 0;
 
 class MatMul : public benchmark::Fixture {
 protected:
-    static const int num_func = 12;
+    static const int num_func = 13;
     int i = 0;
     int n;
     float *A, *B, *C;
@@ -254,6 +249,7 @@ BENCHMARK_DEFINE_F(MatMul, Verify)(benchmark::State& st) {
         i++; matmul_cuda1D(n, 4, A, B, D[i]); verify_res(n, D[0], D[i], i);
         i++; matmul_cuda2D(n, 4, A, B, D[i]); verify_res(n, D[0], D[i], i);
         i++; matmul_cuda2D_coalesce(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
+        i++; matmul_cuda2D_8tiles(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
         i++; matmul_cublas(n, A, B, D[i]);  verify_res(n, D[0], D[i], i);
         i++; matmul_cutlass(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
 #endif // USE_CUDA
@@ -267,8 +263,7 @@ BENCHMARK_DEFINE_F(MatMul, Verify)(benchmark::State& st) {
 BENCHMARK_REGISTER_F(MatMul, Verify)
     ->Unit(benchmark::kMillisecond)
     ->Iterations(1)
-    ->Arg(64);
-
+    ->Arg(128);  // less than 8 fails
 
 static const int step = 1024;
 static const int from = 1024 + 512; // 2048
@@ -387,15 +382,15 @@ BENCHMARK_DEFINE_F(MatMul, CudaKernelCoalesce)(benchmark::State& st) {
 }
 BENCHMARK_REGISTER_F(MatMul, CudaKernelCoalesce)->BENCH_PARAMS_SIMPLE;
 
-//BENCHMARK_DEFINE_F(MatMul, CudaKernel2DTile)(benchmark::State& st) {
-//    int thrs = n / st.range(1);
-//    for (auto _ : st) {
-//        matmul_cuda2D_tile(n, thrs, A, B, C);
-//        benchmark::DoNotOptimize(C);
-//        benchmark::ClobberMemory();
-//    }
-//}
-//BENCHMARK_REGISTER_F(MatMul, CudaKernel2DTile)->BENCH_PARAMS_TILED;
+BENCHMARK_DEFINE_F(MatMul, CudaKernel2DTile)(benchmark::State& st) {
+    int thrs = n / st.range(1);
+    for (auto _ : st) {
+        matmul_cuda2D_8tiles(n, A, B, C);
+        benchmark::DoNotOptimize(C);
+        benchmark::ClobberMemory();
+    }
+}
+BENCHMARK_REGISTER_F(MatMul, CudaKernel2DTile)->BENCH_PARAMS_SIMPLE;
 
 BENCHMARK_DEFINE_F(MatMul, CuBlas)(benchmark::State& st) {
     for (auto _ : st) {
