@@ -35,6 +35,8 @@ else()
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")          # for googlebenchmark
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /openmp:llvm")   # Use OpenMP3.1 (doesn't work still)
+    # set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} /ZI")
+
 endif()
 
 # CUDA settings
@@ -46,7 +48,7 @@ set(CMAKE_CUDA_FLAGS "-allow-unsupported-compiler")   # Allow VS preview
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     message("Debug mode")
-    set(CMAKE_CUDA_FLAGS_DEBUG "-g -G -src-in-ptx --cudart shared")
+    set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -g -G -src-in-ptx --cudart shared")
 endif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 
@@ -140,7 +142,6 @@ FetchContent_Declare(libtorch
 FetchContent_MakeAvailable(libtorch)
 
 find_package(Torch REQUIRED PATHS ${libtorch_SOURCE_DIR} NO_DEFAULT_PATH)
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 add_compile_options(${TORCH_CXX_FLAGS})
 add_compile_definitions(TORCH_CUDA=1)
 
@@ -154,3 +155,12 @@ target_link_libraries(matmuldemo PRIVATE benchmark::benchmark)
 target_link_libraries(matmuldemo PRIVATE CUDA::cublas CUDA::cudart)
 target_link_libraries(matmuldemo PRIVATE CUTLASS)
 target_link_libraries(matmuldemo PRIVATE  "${TORCH_LIBRARIES}")
+
+if (MSVC)
+  file(GLOB TORCH_DLLS "${TORCH_INSTALL_PREFIX}/lib/*.dll")
+  add_custom_command(TARGET matmuldemo
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                     ${TORCH_DLLS}
+                     $<TARGET_FILE_DIR:matmuldemo>)
+endif (MSVC)

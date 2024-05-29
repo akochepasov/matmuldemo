@@ -10,11 +10,12 @@
 #include <benchmark/benchmark.h>
 
 #include <torch/torch.h>
+#include <torch/script.h>
 
 
 #include "matmuldemo.h"
 
-const int data_align = 64;
+const int data_align = 4096;
 
 
 static void init_data(int n, float *A, int64_t seed) {
@@ -201,20 +202,29 @@ void matmul_eigen(int n, const float *A_, const float *B_, float *C_) {
     CM.noalias() = beta * CM + alpha * (BM * AM); // fortran order!
 }
 
-void matmul_torch(int n, const float* A_, const float* B_, float* C_) {
+void matmul_torch(int n, float* A_, float* B_, float* C_) {
     // C = alpha * A x B + beta * C
+    // libtorch don't work with const
     float alpha = 1.0, beta = 0.0;
-    const float* A = (const float*)__builtin_assume_aligned(&A_[0], data_align);
-    const float* B = (const float*)__builtin_assume_aligned(&B_[0], data_align);
+    float* A = (float*)__builtin_assume_aligned(&A_[0], data_align);
+    float* B = (float*)__builtin_assume_aligned(&B_[0], data_align);
     float* C = (float*)__builtin_assume_aligned(&C_[0], data_align);
 
-    // "The best code is the code I don't have to write"
-    torch::Tensor mat1 = torch::rand({ 2, 3 });  
-    torch::Tensor mat2 = torch::rand({ 3, 3 });
-    //torch::mm(mat1, mat2);
-}
+    auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);//  .device(torch::kCUDA);
 
-int cnt = 0;
+    // "The best code is the code I don't have to write"
+    torch::Tensor mat1h = torch::from_blob(A, { n, n }, options);
+    torch::Tensor mat2h = torch::from_blob(B, { n, n }, options);
+    auto device2 = torch::Device(torch::kCUDA); // torch::kCPU requires MKL AVX dll
+
+    torch::Tensor mat1d = mat1h.to(torch::kCUDA);
+    torch::Tensor mat2d = mat2h.to(torch::kCUDA);
+
+    torch::Tensor mat3d = torch::mm(mat1d, mat2d);
+    torch::Tensor mat3h = mat3d.to(torch::kCPU);
+
+    std::memcpy(C, mat3h.data_ptr(), sizeof(float) * mat3h.numel());
+}
 
 class MatMul : public benchmark::Fixture {
 protected:
@@ -273,7 +283,7 @@ BENCHMARK_DEFINE_F(MatMul, Verify)(benchmark::State& st) {
         i++; matmul_sse(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
         i++; matmul_avx(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
 #endif // USE_INTRINSICS
-        i++; matmul_torch(n, A, B, D[i]);
+        i++; matmul_torch(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
     }
 }
 
@@ -374,6 +384,15 @@ BENCHMARK_DEFINE_F(MatMul, Eign)(benchmark::State& st) {
     }
 }
 BENCHMARK_REGISTER_F(MatMul, Eign)->BENCH_PARAMS_SIMPLE;
+
+BENCHMARK_DEFINE_F(MatMul, Torch)(benchmark::State& st) {
+    for (auto _ : st) {
+        matmul_torch(n, A, B, C);
+        benchmark::DoNotOptimize(C);
+        benchmark::ClobberMemory();
+    }
+}
+BENCHMARK_REGISTER_F(MatMul, Torch)->BENCH_PARAMS_SIMPLE;
 
 #ifdef USE_CUDA
 BENCHMARK_DEFINE_F(MatMul, CudaKernel1D)(benchmark::State& st) {
