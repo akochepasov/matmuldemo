@@ -6,6 +6,9 @@
 #define USE_CUDA
 
 
+const int data_align = 4096;
+
+
 #include <iostream>
 
 #define CEIL_DIV(x, y) (((x) + (y) - 1) / (y))

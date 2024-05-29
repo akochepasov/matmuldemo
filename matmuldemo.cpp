@@ -12,10 +12,7 @@
 #include <torch/torch.h>
 #include <torch/script.h>
 
-
 #include "matmuldemo.h"
-
-const int data_align = 4096;
 
 
 static void init_data(int n, float *A, int64_t seed) {

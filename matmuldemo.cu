@@ -1,5 +1,8 @@
 #include <math.h>
 
+//#include <device_launch_parameters.h> // fix intellisense for blockIdx
+//#include <cuda_runtime.h>
+
 #include <thrust/device_vector.h>
 #include <thrust/copy.h>
 #include <thrust/extrema.h>
