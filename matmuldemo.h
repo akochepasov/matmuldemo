@@ -18,7 +18,7 @@ void matmul_cuda1D(int n, int bs, float* A, float* B, float* C);
 void matmul_cuda2D(int n, int bs, float* A, float* B, float* C);
 void matmul_cuda2D_8tiles(int n, float* A, float* B, float* C);
 void matmul_cuda2D_coalesce(int n, float* A, float* B, float* C);
-void matmul_cublas(int n, float* A, float* B, float* C);
-void matmul_cutlass(int n, float* A, float* B, float* C);
+void matmul_cublas(int n, const float* A, const float* B, const float* C);
+void matmul_cutlass(int n, const float* A, const float* B, const float* C);
 #endif // DEMO_CUDA
 
