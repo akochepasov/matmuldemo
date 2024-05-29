@@ -9,10 +9,10 @@ if (NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
 endif()
 
-
 message(STATUS "CMAKE_VERSION:    ${CMAKE_VERSION}")
-message(STATUS "CMAKE_COMMAND:    ${CMAKE_COMMAND}")
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
+message(STATUS "CMAKE_GENERATOR:  ${CMAKE_GENERATOR}")
+message(STATUS "CMAKE_COMMAND:    ${CMAKE_COMMAND}")
 
 include(FetchContent)
 include(ExternalProject)
@@ -111,9 +111,9 @@ FetchContent_MakeAvailable(cutlass)
 
 # Enable pytorch (2.3)
 if (UNIX)
-  set(LIBTORCH_URL       https://download.pytorch.org/libtorch/cu118/libtorch-cxx11-abi-shared-with-deps-2.3.0%2Bcu118.zip)
+  set(LIBTORCH_URL    https://download.pytorch.org/libtorch/cu118/libtorch-cxx11-abi-shared-with-deps-2.3.0%2Bcu118.zip)
 else()
-  set(LIBTORCH_URL       https://download.pytorch.org/libtorch/cu118/libtorch-win-shared-with-deps-2.3.0%2Bcu118.zip)
+  set(LIBTORCH_URL    https://download.pytorch.org/libtorch/cu118/libtorch-win-shared-with-deps-2.3.0%2Bcu118.zip)
 endif()
 
 if (DEFINED ENV{DEPENDENCES_ROOT})
