@@ -9,9 +9,6 @@
 
 #include <benchmark/benchmark.h>
 
-#include <torch/torch.h>
-#include <torch/script.h>
-
 #include "matmuldemo.h"
 
 
@@ -199,29 +196,6 @@ void matmul_eigen(int n, const float *A_, const float *B_, float *C_) {
     CM.noalias() = beta * CM + alpha * (BM * AM); // fortran order!
 }
 
-void matmul_torch(int n, float* A_, float* B_, float* C_) {
-    // C = alpha * A x B + beta * C
-    // libtorch don't work with const
-    float alpha = 1.0, beta = 0.0;
-    float* A = (float*)__builtin_assume_aligned(&A_[0], data_align);
-    float* B = (float*)__builtin_assume_aligned(&B_[0], data_align);
-    float* C = (float*)__builtin_assume_aligned(&C_[0], data_align);
-
-    auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);//  .device(torch::kCUDA);
-
-    // "The best code is the code I don't have to write"
-    torch::Tensor mat1h = torch::from_blob(A, { n, n }, options);
-    torch::Tensor mat2h = torch::from_blob(B, { n, n }, options);
-    auto device2 = torch::Device(torch::kCUDA); // torch::kCPU requires MKL AVX dll
-
-    torch::Tensor mat1d = mat1h.to(torch::kCUDA);
-    torch::Tensor mat2d = mat2h.to(torch::kCUDA);
-
-    torch::Tensor mat3d = torch::mm(mat1d, mat2d);
-    torch::Tensor mat3h = mat3d.to(torch::kCPU);
-
-    std::memcpy(C, mat3h.data_ptr(), sizeof(float) * mat3h.numel());
-}
 
 class MatMul : public benchmark::Fixture {
 protected:

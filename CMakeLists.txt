@@ -147,7 +147,7 @@ add_compile_definitions(TORCH_CUDA=1)
 
 
 # Add source to this project's executable.
-add_executable (matmuldemo "matmuldemo.cpp" "matmuldemo.h" "matmuldemo.cu")
+add_executable (matmuldemo "matmuldemo.cpp" "matmuldemo.h" "matmuldemo.cu" "matmuldemo_torch.cu")
 
 target_link_libraries(matmuldemo PRIVATE Eigen3::Eigen)
 target_link_libraries(matmuldemo PRIVATE OpenMP::OpenMP_CXX)

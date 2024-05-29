@@ -1,11 +1,8 @@
 #include <math.h>
 
-//#include <device_launch_parameters.h> // fix intellisense for blockIdx
-//#include <cuda_runtime.h>
+#include <device_launch_parameters.h> // fix intellisense for blockIdx
 
 #include <thrust/device_vector.h>
-#include <thrust/copy.h>
-#include <thrust/extrema.h>
 
 #include <cublas_v2.h>
 
@@ -135,16 +132,14 @@ sgemm2DBlocktiling(int n, const float* A, const float* B, float* C) {
     // outer-most loop over block tiles
     for (int bkIdx = 0; bkIdx < K; bkIdx += BK) {  // BK = 8
         // populate the SMEM caches
-        int loadOffset;
-        for (loadOffset = 0; loadOffset < BM; loadOffset += strideA) {  // (128 * 128) / (8 * 8) / 8 = 32
-            As[(innerRowA + loadOffset) * BK + innerColA] =             // (BM * BN) / (TM * TN) / BK
+        for (int loadOffset = 0; loadOffset < BM; loadOffset += strideA) {  // (128 * 128) / (8 * 8) / 8 = 32
+            As[(innerRowA + loadOffset) * BK + innerColA] =                 // (BM * BN) / (TM * TN) / BK = 32
                 A[(innerRowA + loadOffset) * K + innerColA];
         }
-        for (loadOffset = 0; loadOffset < BK; loadOffset += strideB) {  // (BM * BN) / (TM * TN) / BN = 32
+        for (int loadOffset = 0; loadOffset < BK; loadOffset += strideB) {  // (BM * BN) / (TM * TN) / BN = 32
             Bs[(innerRowB + loadOffset) * BN + innerColB] =
                 B[(innerRowB + loadOffset) * N + innerColB];
         }
-
         __syncthreads();
 
         // advance blocktile
