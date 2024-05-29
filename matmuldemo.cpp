@@ -9,6 +9,9 @@
 
 #include <benchmark/benchmark.h>
 
+#include <torch/torch.h>
+
+
 #include "matmuldemo.h"
 
 const int data_align = 64;
@@ -198,11 +201,24 @@ void matmul_eigen(int n, const float *A_, const float *B_, float *C_) {
     CM.noalias() = beta * CM + alpha * (BM * AM); // fortran order!
 }
 
+void matmul_torch(int n, const float* A_, const float* B_, float* C_) {
+    // C = alpha * A x B + beta * C
+    float alpha = 1.0, beta = 0.0;
+    const float* A = (const float*)__builtin_assume_aligned(&A_[0], data_align);
+    const float* B = (const float*)__builtin_assume_aligned(&B_[0], data_align);
+    float* C = (float*)__builtin_assume_aligned(&C_[0], data_align);
+
+    // "The best code is the code I don't have to write"
+    torch::Tensor mat1 = torch::rand({ 2, 3 });  
+    torch::Tensor mat2 = torch::rand({ 3, 3 });
+    //torch::mm(mat1, mat2);
+}
+
 int cnt = 0;
 
 class MatMul : public benchmark::Fixture {
 protected:
-    static const int num_func = 13;
+    static const int num_func = 14;
     int i = 0;
     int n;
     float *A, *B, *C;
@@ -257,25 +273,32 @@ BENCHMARK_DEFINE_F(MatMul, Verify)(benchmark::State& st) {
         i++; matmul_sse(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
         i++; matmul_avx(n, A, B, D[i]); verify_res(n, D[0], D[i], i);
 #endif // USE_INTRINSICS
+        i++; matmul_torch(n, A, B, D[i]);
     }
 }
 
 BENCHMARK_REGISTER_F(MatMul, Verify)
     ->Unit(benchmark::kMillisecond)
     ->Iterations(1)
-    ->Arg(128);  // less than 8 fails
+    ->Arg(64);  // less than 8 fails
 
-static const int step = 1024;
+static const int step = 512;
 static const int from = 1024 + 512; // 2048
 static const int nsteps = 1; // 2048 = 32M
 static const int to = from + nsteps * step;
 
 #define BENCH_PARAMS_SIMPLE       \
-    Unit(benchmark::kMillisecond) \
-    ->DenseRange(from, to, step)
+  Unit(benchmark::kMillisecond) \
+  ->ComputeStatistics("min", [](auto v) -> double { \
+        return *(std::min_element(std::begin(v), std::end(v))); \
+    }) \
+    ->DenseRange(from, to, step);
 
 #define BENCH_PARAMS_TILED        \
     Unit(benchmark::kMillisecond) \
+    ->ComputeStatistics("min", [](auto v) -> double { \
+        return *(std::min_element(std::begin(v), std::end(v))); \
+    }) \
     ->ArgsProduct({               \
         benchmark::CreateDenseRange(from, to, step),  \
         benchmark::CreateRange(4, 256, /*multi=*/4)   \

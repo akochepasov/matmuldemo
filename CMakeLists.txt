@@ -13,7 +13,9 @@ endif()
 message(STATUS "CMAKE_VERSION:    ${CMAKE_VERSION}")
 message(STATUS "CMAKE_COMMAND:    ${CMAKE_COMMAND}")
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
+
 include(FetchContent)
+include(ExternalProject)
 
 # CPP settings
 set(CMAKE_CXX_STANDARD 17)
@@ -42,10 +44,10 @@ set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
 set(CMAKE_CUDA_ARCHITECTURES 60) # 70 80
 set(CMAKE_CUDA_FLAGS "-allow-unsupported-compiler")   # Allow VS preview
 
-IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     message("Debug mode")
     set(CMAKE_CUDA_FLAGS_DEBUG "-g -G -src-in-ptx --cudart shared")
-ENDIF(CMAKE_BUILD_TYPE STREQUAL "Debug")
+endif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 
 project(matmuldemo LANGUAGES CXX CUDA)
@@ -105,6 +107,43 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(cutlass)
 
+# Enable pytorch (2.3)
+if (UNIX)
+  set(LIBTORCH_URL       https://download.pytorch.org/libtorch/cu118/libtorch-cxx11-abi-shared-with-deps-2.3.0%2Bcu118.zip)
+else()
+  set(LIBTORCH_URL       https://download.pytorch.org/libtorch/cu118/libtorch-win-shared-with-deps-2.3.0%2Bcu118.zip)
+endif()
+
+if (DEFINED ENV{DEPENDENCES_ROOT})
+  set(LIBTORCH_SOURCE_DIR $ENV{DEPENDENCES_ROOT}/libtorch-src)
+else()
+  set(LIBTORCH_SOURCE_DIR ${FETCHCONTENT_BASE_DIR}/libtorch-src)
+endif()
+
+if(WIN32)
+  # nvtools can be installed outside the CUDA toolkit directory
+   # so prefer the NVTOOLSEXT_PATH windows only environment variable
+  # set(ENV{NVTOOLSEXT_PATH} "path/to/cuda/NvToolsExt/")
+   # In addition on windows the most common name is nvToolsExt64_1
+   find_library(CUDA_nvToolsExt_LIBRARY
+     NAMES nvToolsExt64_1 nvToolsExt64 nvToolsExt
+     PATHS ENV NVTOOLSEXT_PATH
+           ENV CUDA_PATH
+     PATH_SUFFIXES lib/x64 lib
+   )
+endif()
+
+FetchContent_Declare(libtorch 
+  URL ${LIBTORCH_URL} 
+  SOURCE_DIR ${LIBTORCH_SOURCE_DIR}
+)
+FetchContent_MakeAvailable(libtorch)
+
+find_package(Torch REQUIRED PATHS ${libtorch_SOURCE_DIR} NO_DEFAULT_PATH)
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+add_compile_options(${TORCH_CXX_FLAGS})
+add_compile_definitions(TORCH_CUDA=1)
+
 
 # Add source to this project's executable.
 add_executable (matmuldemo "matmuldemo.cpp" "matmuldemo.h" "matmuldemo.cu")
@@ -114,3 +153,4 @@ target_link_libraries(matmuldemo PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(matmuldemo PRIVATE benchmark::benchmark)
 target_link_libraries(matmuldemo PRIVATE CUDA::cublas CUDA::cudart)
 target_link_libraries(matmuldemo PRIVATE CUTLASS)
+target_link_libraries(matmuldemo PRIVATE  "${TORCH_LIBRARIES}")
