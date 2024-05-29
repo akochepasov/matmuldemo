@@ -122,18 +122,20 @@ else()
   set(LIBTORCH_SOURCE_DIR ${FETCHCONTENT_BASE_DIR}/libtorch-src)
 endif()
 
-if(WIN32)
-  # nvtools can be installed outside the CUDA toolkit directory
-   # so prefer the NVTOOLSEXT_PATH windows only environment variable
-  # set(ENV{NVTOOLSEXT_PATH} "path/to/cuda/NvToolsExt/")
-   # In addition on windows the most common name is nvToolsExt64_1
-   find_library(CUDA_nvToolsExt_LIBRARY
-     NAMES nvToolsExt64_1 nvToolsExt64 nvToolsExt
-     PATHS ENV NVTOOLSEXT_PATH
-           ENV CUDA_PATH
-     PATH_SUFFIXES lib/x64 lib
-   )
-endif()
+# If nvToolsExt is from CUDA legacy toolkit 11.8 
+# If not found on Windows, use this
+#if(WIN32)
+#  # nvtools can be installed outside the CUDA toolkit directory
+#   # so prefer the NVTOOLSEXT_PATH windows only environment variable
+#  # set(ENV{NVTOOLSEXT_PATH} "path/to/cuda/NvToolsExt/")
+#   # In addition on windows the most common name is nvToolsExt64_1
+#   find_library(CUDA_nvToolsExt_LIBRARY
+#     NAMES nvToolsExt64_1 nvToolsExt64 nvToolsExt
+#     PATHS ENV NVTOOLSEXT_PATH
+#           ENV CUDA_PATH
+#     PATH_SUFFIXES lib/x64 lib
+#   )
+#endif()
 
 FetchContent_Declare(libtorch 
   URL ${LIBTORCH_URL} 
@@ -143,7 +145,7 @@ FetchContent_MakeAvailable(libtorch)
 
 find_package(Torch REQUIRED PATHS ${libtorch_SOURCE_DIR} NO_DEFAULT_PATH)
 add_compile_options(${TORCH_CXX_FLAGS})
-add_compile_definitions(TORCH_CUDA=1)
+#add_compile_options("-D_GLIBCXX_USE_CXX11_ABI=1 -Llibtorch/lib -ltorch -ltorch_cpu -lc10")
 
 
 # Add source to this project's executable.
