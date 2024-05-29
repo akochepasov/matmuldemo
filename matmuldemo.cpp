@@ -146,7 +146,7 @@ void matmul_avx(int n, const float *A_, const float *B_, float *C_) {
 #endif // USE_INTRINSICS
 
 #ifdef USE_OPENMP
-void matmul_omp_simple(int n, const float* A_, const float* B_, float* C_) {
+void matmul_omp_simple(int n, const float *A_, const float *B_, float *C_) {
     // C = alpha * A x B + beta * C
     float alpha = 1.0, beta = 0.0;
     const float *A = (const float *)__builtin_assume_aligned(&A_[0], data_align);
