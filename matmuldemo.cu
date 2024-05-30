@@ -1,8 +1,8 @@
 #include <math.h>
 
+#include <device_launch_parameters.h> // fix intellisense for blockIdx
+
 #include <thrust/device_vector.h>
-#include <thrust/copy.h>
-#include <thrust/extrema.h>
 
 #include <cublas_v2.h>
 
@@ -132,16 +132,14 @@ sgemm2DBlocktiling(int n, const float* A, const float* B, float* C) {
     // outer-most loop over block tiles
     for (int bkIdx = 0; bkIdx < K; bkIdx += BK) {  // BK = 8
         // populate the SMEM caches
-        int loadOffset;
-        for (loadOffset = 0; loadOffset < BM; loadOffset += strideA) {  // (128 * 128) / (8 * 8) / 8 = 32
-            As[(innerRowA + loadOffset) * BK + innerColA] =             // (BM * BN) / (TM * TN) / BK
+        for (int loadOffset = 0; loadOffset < BM; loadOffset += strideA) {  // (128 * 128) / (8 * 8) / 8 = 32
+            As[(innerRowA + loadOffset) * BK + innerColA] =                 // (BM * BN) / (TM * TN) / BK = 32
                 A[(innerRowA + loadOffset) * K + innerColA];
         }
-        for (loadOffset = 0; loadOffset < BK; loadOffset += strideB) {  // (BM * BN) / (TM * TN) / BN = 32
+        for (int loadOffset = 0; loadOffset < BK; loadOffset += strideB) {  // (BM * BN) / (TM * TN) / BN = 32
             Bs[(innerRowB + loadOffset) * BN + innerColB] =
                 B[(innerRowB + loadOffset) * N + innerColB];
         }
-
         __syncthreads();
 
         // advance blocktile
@@ -177,7 +175,11 @@ sgemm2DBlocktiling(int n, const float* A, const float* B, float* C) {
     }
 }
 
-void matmul_cuda1D(int n, int nthreads, float* A, float* B, float* C) {
+void matmul_cuda1D(int n, int nthreads, const float *A_, const float *B_, float *C_) {
+    const float* A = (const float*)__builtin_assume_aligned(&A_[0], data_align);
+    const float* B = (const float*)__builtin_assume_aligned(&B_[0], data_align);
+    float* C = (float*)__builtin_assume_aligned(&C_[0], data_align);
+
     thrust::device_vector<float> dvA(A, A + n * n);
     thrust::device_vector<float> dvB(B, B + n * n);
     thrust::device_vector<float> dvC(n * n);
@@ -191,7 +193,11 @@ void matmul_cuda1D(int n, int nthreads, float* A, float* B, float* C) {
     thrust::copy(dvC.begin(), dvC.end(), C);
 }
 
-void matmul_cuda2D(int n, int nthreads, float* A, float* B, float* C) {
+void matmul_cuda2D(int n, int nthreads, const float *A_, const float *B_, float *C_) {
+    const float* A = (const float*)__builtin_assume_aligned(&A_[0], data_align);
+    const float* B = (const float*)__builtin_assume_aligned(&B_[0], data_align);
+    float* C = (float*)__builtin_assume_aligned(&C_[0], data_align);
+
     thrust::device_vector<float> dvA(A, A + n * n);
     thrust::device_vector<float> dvB(B, B + n * n);
     thrust::device_vector<float> dvC(n * n);
@@ -208,7 +214,11 @@ void matmul_cuda2D(int n, int nthreads, float* A, float* B, float* C) {
     thrust::copy(dvC.begin(), dvC.end(), C);
 }
 
-void matmul_cuda2D_8tiles(int n, float* A, float* B, float* C) {
+void matmul_cuda2D_8tiles(int n, const float *A_, const float *B_, float *C_) {
+    const float* A = (const float*)__builtin_assume_aligned(&A_[0], data_align);
+    const float* B = (const float*)__builtin_assume_aligned(&B_[0], data_align);
+    float* C = (float*)__builtin_assume_aligned(&C_[0], data_align);
+
     thrust::device_vector<float> dvA(A, A + n * n);
     thrust::device_vector<float> dvB(B, B + n * n);
     thrust::device_vector<float> dvC(n * n);
@@ -225,7 +235,11 @@ void matmul_cuda2D_8tiles(int n, float* A, float* B, float* C) {
     thrust::copy(dvC.begin(), dvC.end(), C);
 }
 
-void matmul_cuda2D_coalesce(int n, float* A, float* B, float* C) {
+void matmul_cuda2D_coalesce(int n, const float *A_, const float *B_, float *C_) {
+    const float* A = (const float*)__builtin_assume_aligned(&A_[0], data_align);
+    const float* B = (const float*)__builtin_assume_aligned(&B_[0], data_align);
+    float* C = (float*)__builtin_assume_aligned(&C_[0], data_align);
+
     thrust::device_vector<float> dvA(A, A + n * n);
     thrust::device_vector<float> dvB(B, B + n * n);
     thrust::device_vector<float> dvC(n * n);
@@ -244,9 +258,13 @@ void matmul_cuda2D_coalesce(int n, float* A, float* B, float* C) {
     thrust::copy(dvC.begin(), dvC.end(), C);
 }
 
-void matmul_cublas(int n, float* A, float* B, float* C) {
+void matmul_cublas(int n, const float* A_, const float* B_, const float* C_) {
     const float alpha = 1.0, beta = 0.0;
+    const float* A = (const float*)__builtin_assume_aligned(&A_[0], data_align);
+    const float* B = (const float*)__builtin_assume_aligned(&B_[0], data_align);
+    float* C = (float*)__builtin_assume_aligned(&C_[0], data_align);
 
+    // "The best code is the code I don't have to write"
     thrust::device_vector<float> dvA(A, A + n * n);
     thrust::device_vector<float> dvB(B, B + n * n);
     thrust::device_vector<float> dvC(n * n);
@@ -263,9 +281,13 @@ void matmul_cublas(int n, float* A, float* B, float* C) {
     cublasDestroy(handle);
 }
 
-void matmul_cutlass(int n, float *A, float *B, float *C) {
+void matmul_cutlass(int n, const float* A_, const float* B_, const float* C_) {
     const float alpha = 1.0, beta = 0.0;
+    const float* A = (const float*)__builtin_assume_aligned(&A_[0], data_align);
+    const float* B = (const float*)__builtin_assume_aligned(&B_[0], data_align);
+    float* C = (float*)__builtin_assume_aligned(&C_[0], data_align);
 
+    // "The best code is the code I don't have to write"
     thrust::device_vector<float> dvA(A, A + n * n);
     thrust::device_vector<float> dvB(B, B + n * n);
     thrust::device_vector<float> dvC(n * n);
