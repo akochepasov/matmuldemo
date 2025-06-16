@@ -76,7 +76,7 @@ set(HAVE_STD_REGEX ON)
 FetchContent_Declare(
   googlebenchmark
   GIT_REPOSITORY https://github.com/google/benchmark.git
-  GIT_TAG v1.7.1
+  GIT_TAG v1.8.5
   GIT_SHALLOW TRUE
   GIT_PROGRESS TRUE
 )
@@ -99,7 +99,7 @@ set(CUTLASS_LIBRARY_OPERATIONS=gemm)
 FetchContent_Declare(
   cutlass
   GIT_REPOSITORY https://github.com/NVIDIA/cutlass.git
-  GIT_TAG v2.9.1
+  GIT_TAG v3.5.1
   GIT_SHALLOW TRUE
   GIT_PROGRESS TRUE
 )
@@ -107,9 +107,9 @@ FetchContent_MakeAvailable(cutlass)
 
 # Enable pytorch (2.3)
 if (UNIX)
-  set(LIBTORCH_URL    https://download.pytorch.org/libtorch/cu118/libtorch-cxx11-abi-shared-with-deps-2.3.0%2Bcu118.zip)
+  set(LIBTORCH_URL    https://download.pytorch.org/libtorch/cu121/libtorch-cxx11-abi-shared-with-deps-2.4.1%2Bcu121.zip)
 else()
-  set(LIBTORCH_URL    https://download.pytorch.org/libtorch/cu118/libtorch-win-shared-with-deps-2.3.0%2Bcu118.zip)
+  set(LIBTORCH_URL    https://download.pytorch.org/libtorch/cu121/libtorch-win-shared-with-deps-2.4.1%2Bcu121.zip)
 endif(UNIX)
 
 if (DEFINED ENV{DEPENDENCES_ROOT})
@@ -134,8 +134,8 @@ endif()
 #   )
 #endif()
 
-FetchContent_Declare(libtorch 
-  URL ${LIBTORCH_URL} 
+FetchContent_Declare(libtorch
+  URL ${LIBTORCH_URL}
   SOURCE_DIR ${LIBTORCH_SOURCE_DIR}
 )
 FetchContent_MakeAvailable(libtorch)

@@ -238,28 +238,27 @@ BENCHMARK_DEFINE_F(MatMul, Verify)(benchmark::State& st) {
     n = st.range(0);
 
     for (auto _ : st) {
-        int i = 0;
-        matmul_eigen(n, A, B, D[i++]); // Reference function
+        int i = 0; matmul_eigen(n, A, B, D[0]); // Reference function
 #ifdef USE_NAIVE
-        matmul_naive1(n, A, B, D[i]);           verify_res(n, D[0], D[i], i++);
-        matmul_naive2(n, A, B, D[i]);           verify_res(n, D[0], D[i], i++);
+        i++; matmul_naive1(n, A, B, D[i]);      verify_res(n, D[0], D[i], i);
+        i++; matmul_naive2(n, A, B, D[i]);      verify_res(n, D[0], D[i], i);
 #endif // USE_NAIVE
 #ifdef USE_INTRINSICS
-        matmul_sse(n, A, B, D[i]);              verify_res(n, D[0], D[i], i++);
-        matmul_avx(n, A, B, D[i]);              verify_res(n, D[0], D[i], i++);
+        i++; matmul_sse(n, A, B, D[i]);         verify_res(n, D[0], D[i], i);
+        i++; matmul_avx(n, A, B, D[i]);         verify_res(n, D[0], D[i], i);
 #endif // USE_INTRINSICS
 #ifdef USE_OPENMP
-        matmul_omp_simple(n, A, B, D[i]);       verify_res(n, D[0], D[i], i++);
-        matmul_omp_tile(n, 4, A, B, D[i]);      verify_res(n, D[0], D[i], i++);
+        i++; matmul_omp_simple(n, A, B, D[i]);  verify_res(n, D[0], D[i], i);
+        i++; matmul_omp_tile(n, 4, A, B, D[i]); verify_res(n, D[0], D[i], i);
 #endif // USE_OPENMP
 #ifdef USE_CUDA
-        matmul_cuda1D(n, 4, A, B, D[i]);        verify_res(n, D[0], D[i], i++);
-        matmul_cuda2D(n, 4, A, B, D[i]);        verify_res(n, D[0], D[i], i++);
-        matmul_cuda2D_coalesce(n, A, B, D[i]);  verify_res(n, D[0], D[i], i++);
-        matmul_cuda2D_8tiles(n, A, B, D[i]);    verify_res(n, D[0], D[i], i++);
-        matmul_cublas(n, A, B, D[i]);           verify_res(n, D[0], D[i], i++);
-        matmul_cutlass(n, A, B, D[i]);          verify_res(n, D[0], D[i], i++);
-        matmul_torch_cuda(n, A, B, D[i]);       verify_res(n, D[0], D[i], i++);
+        i++; matmul_cuda1D(n, 4, A, B, D[i]);        verify_res(n, D[0], D[i], i);
+        i++; matmul_cuda2D(n, 4, A, B, D[i]);        verify_res(n, D[0], D[i], i);
+        i++; matmul_cuda2D_coalesce(n, A, B, D[i]);  verify_res(n, D[0], D[i], i);
+        i++; matmul_cuda2D_8tiles(n, A, B, D[i]);    verify_res(n, D[0], D[i], i);
+        i++; matmul_cublas(n, A, B, D[i]);           verify_res(n, D[0], D[i], i);
+        i++; matmul_cutlass(n, A, B, D[i]);          verify_res(n, D[0], D[i], i);
+        i++; matmul_torch_cuda(n, A, B, D[i]);       verify_res(n, D[0], D[i], i);
 #endif // USE_CUDA
     }
 }
