@@ -1,3 +1,7 @@
+#include "matmuldemo.h"
+
+#ifdef USE_CUDA
+
 #include <math.h>
 
 #include <device_launch_parameters.h> // fix intellisense for blockIdx
@@ -7,8 +11,6 @@
 #include <cublas_v2.h>
 
 #include <cutlass/gemm/device/gemm.h>
-
-#include "matmuldemo.h"
 
 
 __global__ void matmul_kernel1D(int n, float* A, float* B, float* C) {
@@ -316,3 +318,4 @@ void matmul_cutlass(int n, const float* A_, const float* B_, const float* C_) {
 
     thrust::copy(dvC.begin(), dvC.end(), C);
 }
+#endif // USE_CUDA
